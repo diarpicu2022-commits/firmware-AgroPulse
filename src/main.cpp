@@ -255,6 +255,10 @@ void setup() {
     // Conexión WiFi con portal de configuración (WiFiManager)
     displayMensaje("Conectando WiFi...", "", "Abre: AgroPulse-Setup", "si no hay red guardada");
     commConnectWifi();
+    // Re-init I2C + OLED: el radio WiFi puede perturbar el periférico I2C durante
+    // la conexión, causando que sendBuffer() falle en silencio y la OLED quede
+    // mostrando el splash inicial. displayReinit() recupera el bus sin mostrar nada.
+    displayReinit();
     // GPS init ANTES de commStartTask(): Serial2 debe estar listo antes
     // de que la tarea HTTP arranque en Core 0.
     gpsInit();

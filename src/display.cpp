@@ -28,6 +28,14 @@ void displayInit() {
     delay(2500);
 }
 
+// Re-initialize I2C bus and OLED controller. Call after WiFi radio startup,
+// which can disrupt the I2C peripheral state and cause silent sendBuffer() failures.
+void displayReinit() {
+    Wire.begin(PIN_SDA, PIN_SCL);
+    oled.begin();
+    oled.setContrast(220);
+}
+
 void displayMensaje(const char* l1, const char* l2, const char* l3, const char* l4) {
     oled.clearBuffer();
     oled.setFont(u8g2_font_6x10_tr);
@@ -60,7 +68,7 @@ static void dibujarHome(int pagina) {
     oled.drawStr(0, 10, titulo.c_str());
 
     struct tm ti;
-    if (getLocalTime(&ti)) {
+    if (getLocalTime(&ti, 0)) {
         char hora[6];
         sprintf(hora, "%02d:%02d", ti.tm_hour, ti.tm_min);
         oled.drawStr(93, 10, hora);
