@@ -70,13 +70,22 @@ void displayReinit() {
 
     // Reinicializar periférico I2C del ESP32
     Wire.end();
-    delay(50);
+    delay(80);
     Wire.begin(PIN_SDA, PIN_SCL);
-    delay(50);
+    delay(120);
 
-    // Reinicializar controlador OLED y borrar pantalla
+    // Reinicializar controlador OLED y borrar pantalla.
+    // Dos intentos: el radio WiFi puede dejar al SSD1306 en un estado
+    // transitorio donde el primer begin() no completa la inicialización.
+    oled.begin();
+    delay(50);
     oled.begin();
     oled.setContrast(220);
+    oled.clearBuffer();
+    oled.sendBuffer();
+    delay(30);
+    // Segunda pasada de clearBuffer/sendBuffer para asegurar que el GRAM
+    // del controlador quede limpio (sin residuos de la pantalla anterior).
     oled.clearBuffer();
     oled.sendBuffer();
 }

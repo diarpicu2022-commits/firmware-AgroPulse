@@ -257,6 +257,10 @@ void setup() {
     // Conexión WiFi con portal de configuración (WiFiManager)
     displayMensaje("Conectando WiFi...", "", "Abre: AgroPulse-Setup", "si no hay red guardada");
     commConnectWifi();
+    // Esperar a que el radio WiFi se estabilice antes de recuperar I2C.
+    // El transceiver 2.4 GHz perturba el bus durante y justo después de la asociación;
+    // sin este delay, displayReinit() puede fallar silenciosamente.
+    delay(800);
     // Re-init I2C + OLED: el radio WiFi puede perturbar el periférico I2C durante
     // la conexión, causando que sendBuffer() falle en silencio y la OLED quede
     // mostrando el splash inicial. displayReinit() recupera el bus sin mostrar nada.
@@ -334,11 +338,11 @@ void loop() {
     // 2. Máquina de estados del menú (cada ciclo)
     procesarMenu();
 
-    // 3. Recuperación periódica del bus I2C (cada 5 min)
-    // El radio WiFi puede corromper el bus durante la operación normal.
-    // displayReinit() hace los 9 pulsos de SCL + Wire.begin + oled.begin.
+    // 3. Recuperación periódica del bus I2C (cada 30 s los primeros 5 min,
+    //    luego cada 5 min). El radio WiFi puede corromper el bus durante la
+    //    operación normal; reinits frecuentes al arrancar ayudan a estabilizar.
     // Forzar g_tUI = 0 asegura un displayRender inmediato tras el reinit.
-    if (ahora - g_tOledReinit >= 60000UL) {
+    if (ahora - g_tOledReinit >= (ahora < 300000UL ? 30000UL : 300000UL)) {
         displayReinit();
         g_tUI         = 0;     // dispara displayRender en la próxima iteración
         g_tOledReinit = ahora;
