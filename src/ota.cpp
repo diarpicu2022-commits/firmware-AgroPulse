@@ -17,7 +17,8 @@
 // La clave privada NUNCA va aquí — solo la pública.
 static const char OTA_PUBLIC_KEY_PEM[] = R"(
 -----BEGIN PUBLIC KEY-----
-REEMPLAZAR_CON_TU_CLAVE_PUBLICA_REAL_DESPUES_DE_EJECUTAR_generar_claves.py
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEedhTH63j3CiD9iUkQ5UQmPtxZlYA
+Re8jWh5kVFEp28u+bzUymEW1mwzXRL3SD+3vtm91roySR5Nu8U5Q7EPsmA==
 -----END PUBLIC KEY-----
 )";
 

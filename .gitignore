@@ -3,3 +3,6 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Claves OTA — la privada NUNCA va al repositorio
+scripts/private_key.pem
