@@ -25,6 +25,7 @@
 #include "comm.h"
 #include "display.h"
 #include "gps.h"
+#include "ota.h"
 #include "../include/config.h"
 
 // ── Estado del menú ───────────────────────────────────────────
@@ -262,6 +263,14 @@ void setup() {
     // GPS init ANTES de commStartTask(): Serial2 debe estar listo antes
     // de que la tarea HTTP arranque en Core 0.
     gpsInit();
+
+    // OTA: verifica si hay firmware nuevo ANTES de descargar config.
+    // Si hay actualización válida, otaCheck() reinicia el ESP32 y no retorna.
+    // Requiere dispositivo ya vinculado (ghId > 0) para autenticarse.
+    if (commGetStatus().wifiConnected && commGetGhId() > 0) {
+        displayMensaje("Verificando", "actualizacion...", "", "");
+        otaCheck();
+    }
 
     // Descarga configuración dinámica (sensores/actuadores) desde el backend.
     // Se hace ANTES de commStartTask() para que solo Core 1 use s_cliente aquí;

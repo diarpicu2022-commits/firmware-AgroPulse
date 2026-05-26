@@ -67,6 +67,10 @@
 #define DEFAULT_HEATER_ON_THRESHOLD  12.0f   // (reservado — sin relay de calefactor)
 #define DEFAULT_HEATER_OFF_THRESHOLD 18.0f
 
+// ── OTA (Over-The-Air update) ─────────────────────────────────
+#define OTA_HTTP_TIMEOUT_MS      5000   // timeout para version check y descarga de firma
+#define OTA_DOWNLOAD_TIMEOUT_MS 60000   // timeout para descargar el binario completo (~1 MB)
+
 // ── Serial ────────────────────────────────────────────────────
 #define SERIAL_BAUD_RATE 115200
 
