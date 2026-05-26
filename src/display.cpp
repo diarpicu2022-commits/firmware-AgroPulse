@@ -31,13 +31,35 @@ void displayInit() {
 // Re-initialize I2C bus and OLED controller. Call after WiFi radio startup,
 // which can disrupt the I2C peripheral state and cause silent sendBuffer() failures.
 void displayReinit() {
+    // Recuperación estándar del bus I2C (IEEE I2C spec §3.1.16):
+    // si el radio WiFi dejó al SSD1306 en mitad de una transacción,
+    // 9 pulsos de SCL desenganchan al slave y la condición STOP libera el bus.
+    pinMode(PIN_SCL, OUTPUT);
+    pinMode(PIN_SDA, OUTPUT);
+    digitalWrite(PIN_SDA, HIGH);
+    for (int i = 0; i < 9; i++) {
+        digitalWrite(PIN_SCL, LOW);
+        delayMicroseconds(10);
+        digitalWrite(PIN_SCL, HIGH);
+        delayMicroseconds(10);
+    }
+    // Condición STOP: SDA sube mientras SCL está HIGH
+    digitalWrite(PIN_SDA, LOW);
+    delayMicroseconds(10);
+    digitalWrite(PIN_SCL, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(PIN_SDA, HIGH);
+    delay(20);
+
+    // Reinicializar periférico I2C del ESP32
     Wire.end();
-    delay(100);
+    delay(50);
     Wire.begin(PIN_SDA, PIN_SCL);
     delay(50);
+
+    // Reinicializar controlador OLED y borrar pantalla
     oled.begin();
     oled.setContrast(220);
-    // Clear screen so stale content (e.g. "Conectando WiFi...") doesn't persist
     oled.clearBuffer();
     oled.sendBuffer();
 }
