@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "author": "AgroPulse",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp",  "top": 112, "left": 176, "attrs": {} },
+
+    { "type": "wokwi-ssd1306",    "id": "oled",  "top":  0,  "left": -48,  "attrs": { "i2cAddress": "0x3c" } },
+
+    { "type": "wokwi-dht22",      "id": "dht22", "top":  0,  "left": 400,  "attrs": { "temperature": "25", "humidity": "60" } },
+    { "type": "wokwi-resistor",   "id": "rdht22","top":  8,  "left": 368,  "rotate": 90, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-dht22",      "id": "dht11", "top": 96,  "left": 400,  "attrs": { "temperature": "22", "humidity": "55" } },
+    { "type": "wokwi-resistor",   "id": "rdht11","top": 104, "left": 368,  "rotate": 90, "attrs": { "value": "10000" } },
+
+    { "type": "wokwi-potentiometer","id": "soil", "top": 192, "left": 400,  "attrs": { "value": "0.45", "label": "Suelo (D34)" } },
+    { "type": "wokwi-potentiometer","id": "lm35", "top": 272, "left": 400,  "attrs": { "value": "0.30", "label": "LM35 (D35)" } },
+
+    { "type": "wokwi-servo",      "id": "servo", "top": 352, "left": 400,  "attrs": {} },
+
+    { "type": "wokwi-led",        "id": "led1",  "top": 448, "left": 192,  "attrs": { "color": "limegreen", "label": "LED1 (D18)" } },
+    { "type": "wokwi-resistor",   "id": "rl1",   "top": 448, "left": 224,  "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led",        "id": "led2",  "top": 480, "left": 192,  "attrs": { "color": "yellow", "label": "LED2 (D19)" } },
+    { "type": "wokwi-resistor",   "id": "rl2",   "top": 480, "left": 224,  "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led",        "id": "lpump", "top": 448, "left": 304,  "attrs": { "color": "blue",  "label": "Bomba (D26)" } },
+    { "type": "wokwi-resistor",   "id": "rp",    "top": 448, "left": 336,  "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led",        "id": "lfan",  "top": 480, "left": 304,  "attrs": { "color": "red",   "label": "Motor (D27)" } },
+    { "type": "wokwi-resistor",   "id": "rf",    "top": 480, "left": 336,  "attrs": { "value": "220" } },
+
+    { "type": "wokwi-pushbutton", "id": "bup",   "top": 448, "left": -48,  "attrs": { "color": "green",  "label": "UP (D25)" } },
+    { "type": "wokwi-pushbutton", "id": "bdown", "top": 480, "left": -48,  "attrs": { "color": "green",  "label": "DOWN (D23)" } },
+    { "type": "wokwi-pushbutton", "id": "bsel",  "top": 512, "left": -48,  "attrs": { "color": "blue",   "label": "SEL (D32)" } },
+    { "type": "wokwi-pushbutton", "id": "bback", "top": 544, "left": -48,  "attrs": { "color": "yellow", "label": "BACK (D33)" } }
+  ],
+  "connections": [
+    ["oled:VCC",  "esp:3V3",   "red",      []],
+    ["oled:GND",  "esp:GND.1", "black",    []],
+    ["oled:SDA",  "esp:D21",   "#1E90FF",  []],
+    ["oled:SCL",  "esp:D22",   "#1E90FF",  []],
+
+    ["rdht22:1",  "esp:3V3",   "red",      []],
+    ["rdht22:2",  "dht22:SDA", "#00CC00",  []],
+    ["dht22:VCC", "esp:3V3",   "red",      []],
+    ["dht22:GND", "esp:GND.1", "black",    []],
+    ["dht22:SDA", "esp:D4",    "#00CC00",  []],
+
+    ["rdht11:1",  "esp:3V3",   "red",      []],
+    ["rdht11:2",  "dht11:SDA", "#009900",  []],
+    ["dht11:VCC", "esp:3V3",   "red",      []],
+    ["dht11:GND", "esp:GND.1", "black",    []],
+    ["dht11:SDA", "esp:D5",    "#009900",  []],
+
+    ["soil:VCC",  "esp:3V3",   "red",      []],
+    ["soil:GND",  "esp:GND.1", "black",    []],
+    ["soil:SIG",  "esp:D34",   "orange",   []],
+
+    ["lm35:VCC",  "esp:3V3",   "red",      []],
+    ["lm35:GND",  "esp:GND.1", "black",    []],
+    ["lm35:SIG",  "esp:D35",   "orange",   []],
+
+    ["servo:V+",  "esp:3V3",   "red",      []],
+    ["servo:GND", "esp:GND.1", "black",    []],
+    ["servo:PWM", "esp:D15",   "purple",   []],
+
+    ["esp:D18",   "rl1:1",     "#00FF00",  []],
+    ["rl1:2",     "led1:A",    "#00FF00",  []],
+    ["led1:K",    "esp:GND.2", "black",    []],
+
+    ["esp:D19",   "rl2:1",     "yellow",   []],
+    ["rl2:2",     "led2:A",    "yellow",   []],
+    ["led2:K",    "esp:GND.2", "black",    []],
+
+    ["esp:3V3",   "rp:1",      "red",      []],
+    ["rp:2",      "lpump:A",   "blue",     []],
+    ["lpump:K",   "esp:D26",   "blue",     []],
+
+    ["esp:3V3",   "rf:1",      "red",      []],
+    ["rf:2",      "lfan:A",    "red",      []],
+    ["lfan:K",    "esp:D27",   "red",      []],
+
+    ["bup:1.l",   "esp:D25",   "gray",     []],
+    ["bup:2.l",   "esp:GND.2", "black",    []],
+    ["bdown:1.l", "esp:D23",   "gray",     []],
+    ["bdown:2.l", "esp:GND.2", "black",    []],
+    ["bsel:1.l",  "esp:D32",   "gray",     []],
+    ["bsel:2.l",  "esp:GND.3", "black",    []],
+    ["bback:1.l", "esp:D33",   "gray",     []],
+    ["bback:2.l", "esp:GND.3", "black",    []]
+  ]
+}
