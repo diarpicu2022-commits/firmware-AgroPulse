@@ -31,9 +31,15 @@ void displayInit() {
 // Re-initialize I2C bus and OLED controller. Call after WiFi radio startup,
 // which can disrupt the I2C peripheral state and cause silent sendBuffer() failures.
 void displayReinit() {
+    Wire.end();
+    delay(100);
     Wire.begin(PIN_SDA, PIN_SCL);
+    delay(50);
     oled.begin();
     oled.setContrast(220);
+    // Clear screen so stale content (e.g. "Conectando WiFi...") doesn't persist
+    oled.clearBuffer();
+    oled.sendBuffer();
 }
 
 void displayMensaje(const char* l1, const char* l2, const char* l3, const char* l4) {
