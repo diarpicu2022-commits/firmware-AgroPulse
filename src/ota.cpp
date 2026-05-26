@@ -90,7 +90,7 @@ bool otaCheck() {
         return false;
     }
 
-    JsonDocument doc;
+    DynamicJsonDocument doc(256);
     deserializeJson(doc, httpVer.getString());
     httpVer.end();
 
