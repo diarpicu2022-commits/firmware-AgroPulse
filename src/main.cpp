@@ -36,12 +36,13 @@ static int        cursorAngulo   = 2;  // índice en ANGULOS_SERVO (90° por def
 static int        g_editGhId     = 0;  // valor en edición para MENU_SET_GHID
 
 // ── Estado del sistema ────────────────────────────────────────
-static bool              g_autoMode  = false;
+static bool              g_autoMode     = false;
 static ActuatorThresholds g_thresholds;
 static ActuatorState      g_autoState;
-static unsigned long      g_tLectura = 0;
-static unsigned long      g_tUI      = 0;
-static int               g_homePage  = 0;   // 0 = página 1, 1 = página 2
+static unsigned long      g_tLectura    = 0;
+static unsigned long      g_tUI         = 0;
+static unsigned long      g_tOledReinit = 0;   // recuperación periódica de I2C
+static int               g_homePage     = 0;   // 0 = página 1, 1 = página 2
 
 // ── Debounce de botones ───────────────────────────────────────
 // UP/DOWN tienen auto-repeat al mantener: 400 ms de espera, luego cada 120 ms
@@ -328,7 +329,17 @@ void loop() {
     // 2. Máquina de estados del menú (cada ciclo)
     procesarMenu();
 
-    // 3. Lectura de sensores cada INTERVALO_LECTURA_MS
+    // 3. Recuperación periódica del bus I2C (cada 5 min)
+    // El radio WiFi puede corromper el bus durante la operación normal.
+    // displayReinit() hace los 9 pulsos de SCL + Wire.begin + oled.begin.
+    // Forzar g_tUI = 0 asegura un displayRender inmediato tras el reinit.
+    if (ahora - g_tOledReinit >= 300000UL) {
+        displayReinit();
+        g_tUI         = 0;     // dispara displayRender en la próxima iteración
+        g_tOledReinit = ahora;
+    }
+
+    // 4. Lectura de sensores cada INTERVALO_LECTURA_MS
     if (ahora - g_tLectura >= INTERVALO_LECTURA_MS) {
         SensorReadings r = sensorsRead();
         sensorsPrintSerial(r);
@@ -338,13 +349,13 @@ void loop() {
         g_tLectura = ahora;
     }
 
-    // 4. Actualización del OLED cada INTERVALO_UI_MS
+    // 5. Actualización del OLED cada INTERVALO_UI_MS
     if (ahora - g_tUI >= INTERVALO_UI_MS) {
         displayRender(estadoActual, cursorMenu, cursorActuador, cursorAngulo, g_homePage, g_editGhId);
         g_tUI = ahora;
     }
 
-    // 5. Comandos de configuración por Serial
+    // 6. Comandos de configuración por Serial
     if (Serial.available()) {
         String cmd = Serial.readStringUntil('\n');
         commProcessSerialCommand(cmd, g_thresholds, g_autoMode);

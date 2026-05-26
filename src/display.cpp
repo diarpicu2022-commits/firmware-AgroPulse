@@ -11,6 +11,23 @@ static const uint8_t ICO_GOTA[]   = {0x04, 0x0E, 0x1F, 0x3F, 0x3F, 0x3F, 0x1E, 0
 static const uint8_t ICO_PLANTA[] = {0x08, 0x1C, 0x3E, 0x3E, 0x08, 0x08, 0x1C, 0x00};
 
 void displayInit() {
+    // Recuperación preventiva del bus I2C antes de Wire.begin():
+    // Si la sesión anterior terminó con el bus atascado (SDA en LOW),
+    // Wire.begin() falla silenciosamente y el SSD1306 muestra el GRAM previo
+    // (el splash) para siempre. Los 9 pulsos de SCL desbloquean al slave
+    // y la condición STOP libera el bus antes de inicializar Wire.
+    pinMode(PIN_SCL, OUTPUT);
+    pinMode(PIN_SDA, OUTPUT);
+    digitalWrite(PIN_SDA, HIGH);
+    for (int i = 0; i < 9; i++) {
+        digitalWrite(PIN_SCL, LOW);  delayMicroseconds(10);
+        digitalWrite(PIN_SCL, HIGH); delayMicroseconds(10);
+    }
+    digitalWrite(PIN_SDA, LOW);  delayMicroseconds(10);
+    digitalWrite(PIN_SCL, HIGH); delayMicroseconds(10);
+    digitalWrite(PIN_SDA, HIGH);
+    delay(20);
+
     Wire.begin(PIN_SDA, PIN_SCL);
     oled.begin();
     oled.setContrast(220);
