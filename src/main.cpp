@@ -254,6 +254,12 @@ void setup() {
         pinMode(botones[i].pin, INPUT_PULLUP);
     }
 
+    // commInit() arranca el radio WiFi (WiFiManager), lo que puede corromper el
+    // bus I2C antes de que lleguemos siquiera a displayMensaje(). Sin este reinit
+    // el splash "AgroPulse / Iniciando..." se queda pegado porque sendBuffer()
+    // falla silenciosamente en las llamadas siguientes.
+    displayReinit();
+
     // Conexión WiFi con portal de configuración (WiFiManager)
     displayMensaje("Conectando WiFi...", "", "Abre: AgroPulse-Setup", "si no hay red guardada");
     commConnectWifi();
