@@ -297,6 +297,11 @@ void setup() {
         // Si no hay fix, continúa normalmente sin error visible
     }
 
+    // Recuperación final de I2C: las peticiones HTTP de OTA y descarga de config
+    // pueden re-corromper el bus. Este reinit garantiza que loop() arranque
+    // con el display funcionando, sin importar lo que ocurrió en setup.
+    displayReinit();
+
     // HTTP task arranca AL FINAL: en este punto setup() ya terminó todos
     // sus requests, así que httpTask (Core 0) y loop() (Core 1) no compiten.
     // El mutex en comm.cpp protege accesos concurrentes desde el menú.
@@ -333,7 +338,7 @@ void loop() {
     // El radio WiFi puede corromper el bus durante la operación normal.
     // displayReinit() hace los 9 pulsos de SCL + Wire.begin + oled.begin.
     // Forzar g_tUI = 0 asegura un displayRender inmediato tras el reinit.
-    if (ahora - g_tOledReinit >= 300000UL) {
+    if (ahora - g_tOledReinit >= 60000UL) {
         displayReinit();
         g_tUI         = 0;     // dispara displayRender en la próxima iteración
         g_tOledReinit = ahora;
