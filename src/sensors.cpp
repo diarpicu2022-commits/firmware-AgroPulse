@@ -163,16 +163,22 @@ static void refreshDHTCache() {
         s_t22 = t; s_h22 = h;
     }
     if (s_dht11) {
-        // DHT11 library caches for 2s — retrying at 50ms returns the same NaN.
-        // Read once per sensor cycle (INTERVALO_LECTURA_MS = 10s, well past cache).
-        // Guard: skip until 2s after begin() so the sensor is stable.
-        if ((millis() - s_dht11InitTime) < 2000) {
+        // Guard: skip until 3s after begin() so the sensor is stable.
+        if ((millis() - s_dht11InitTime) < 3000) {
             s_t11 = NAN; s_h11 = NAN;
         } else {
-            float t = s_dht11->readTemperature();
-            float h = s_dht11->readHumidity();
-            s_t11 = (!isnan(t) && t >= 0.0f && t < 60.0f)  ? t : NAN;
-            s_h11 = (!isnan(h) && h >= 0.0f && h <= 100.0f) ? h : NAN;
+            float t = NAN, h = NAN;
+            // DHT11 caches for 2s; retries must be spaced ≥2s apart.
+            // We do up to 2 attempts with a 2100ms gap to recover from a single bad read.
+            for (int r = 0; r < 2 && (isnan(t) || isnan(h)); r++) {
+                if (r > 0) { vTaskDelay(pdMS_TO_TICKS(2100)); }
+                float rt = s_dht11->readTemperature();
+                float rh = s_dht11->readHumidity();
+                if (!isnan(rt) && rt >= 0.0f && rt < 60.0f)   t = rt;
+                if (!isnan(rh) && rh >= 0.0f && rh <= 100.0f) h = rh;
+            }
+            s_t11 = t;
+            s_h11 = h;
         }
     }
 }
