@@ -111,11 +111,18 @@ static void procesarMenu() {
 
     switch (estadoActual) {
 
-        case MENU_HOME:
-            if (arr || aba) g_homePage = 1 - g_homePage;  // alterna entre página 1 y 2
+        case MENU_HOME: {
+            // Directional page navigation (clamped) — safe with UP/DOWN auto-repeat.
+            // Toggle (1 - page) caused the page to oscillate at 120 ms when held,
+            // making the screen appear to flicker/crash.
+            int numPages = max(1, (NUM_SENSORES + 2) / 3);
+            if (arr) g_homePage = max(0, g_homePage - 1);
+            if (aba) g_homePage = min(numPages - 1, g_homePage + 1);
+            if (g_homePage >= numPages) g_homePage = numPages - 1;  // clamp on config reload
             if (sel) { estadoActual = MENU_ACTUADORES; cursorMenu = 0; }
             if (atr) { estadoActual = MENU_CONFIG;     cursorMenu = 0; }
             break;
+        }
 
         case MENU_ACTUADORES:
             if (arr) cursorMenu = max(0, cursorMenu - 1);
