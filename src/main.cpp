@@ -254,22 +254,16 @@ void setup() {
         pinMode(botones[i].pin, INPUT_PULLUP);
     }
 
-    // commInit() arranca el radio WiFi (WiFiManager), lo que puede corromper el
-    // bus I2C antes de que lleguemos siquiera a displayMensaje(). Sin este reinit
-    // el splash "AgroPulse / Iniciando..." se queda pegado porque sendBuffer()
-    // falla silenciosamente en las llamadas siguientes.
-    displayReinit();
+    // commInit() es ligero (solo NVS + mutex) — no arranca el radio WiFi.
+    // El I2C está sano aquí: borrar el splash con un clear rápido es suficiente.
+    displayClear();
 
     // Conexión WiFi con portal de configuración (WiFiManager)
     displayMensaje("Conectando WiFi...", "", "Abre: AgroPulse-Setup", "si no hay red guardada");
     commConnectWifi();
-    // Esperar a que el radio WiFi se estabilice antes de recuperar I2C.
-    // El transceiver 2.4 GHz perturba el bus durante y justo después de la asociación;
-    // sin este delay, displayReinit() puede fallar silenciosamente.
-    delay(800);
-    // Re-init I2C + OLED: el radio WiFi puede perturbar el periférico I2C durante
-    // la conexión, causando que sendBuffer() falle en silencio y la OLED quede
-    // mostrando el splash inicial. displayReinit() recupera el bus sin mostrar nada.
+    // commConnectWifi() arranca el transceiver 2.4 GHz, que puede corromper el
+    // periférico I2C del ESP32. Esperar 1 s y hacer la recuperación completa de bus.
+    delay(1000);
     displayReinit();
     // GPS init ANTES de commStartTask(): Serial2 debe estar listo antes
     // de que la tarea HTTP arranque en Core 0.

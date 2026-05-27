@@ -45,47 +45,50 @@ void displayInit() {
     delay(2500);
 }
 
-// Re-initialize I2C bus and OLED controller. Call after WiFi radio startup,
-// which can disrupt the I2C peripheral state and cause silent sendBuffer() failures.
+// Fast clear: only valid when I2C is known-healthy (before WiFi radio starts).
+void displayClear() {
+    oled.clearBuffer();
+    oled.sendBuffer();
+}
+
+// Re-initialize I2C bus and OLED controller after WiFi radio activity.
+// Wire.end() can break the ESP32 I2C peripheral state on some silicon revisions;
+// instead we use a pin-level bus reset then call Wire.begin() directly.
 void displayReinit() {
-    // Recuperación estándar del bus I2C (IEEE I2C spec §3.1.16):
-    // si el radio WiFi dejó al SSD1306 en mitad de una transacción,
-    // 9 pulsos de SCL desenganchan al slave y la condición STOP libera el bus.
+    // Paso 1: recuperación de bus a nivel de pin (IEEE I2C spec §3.1.16).
+    // Poner SDA en HIGH con pines en OUTPUT, pulsar SCL x9 para desbloquear slave.
     pinMode(PIN_SCL, OUTPUT);
     pinMode(PIN_SDA, OUTPUT);
     digitalWrite(PIN_SDA, HIGH);
+    digitalWrite(PIN_SCL, HIGH);
     for (int i = 0; i < 9; i++) {
-        digitalWrite(PIN_SCL, LOW);
-        delayMicroseconds(10);
-        digitalWrite(PIN_SCL, HIGH);
-        delayMicroseconds(10);
+        digitalWrite(PIN_SCL, LOW);  delayMicroseconds(15);
+        digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
     }
     // Condición STOP: SDA sube mientras SCL está HIGH
-    digitalWrite(PIN_SDA, LOW);
-    delayMicroseconds(10);
-    digitalWrite(PIN_SCL, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(PIN_SDA, HIGH);
-    delay(20);
+    digitalWrite(PIN_SDA, LOW);  delayMicroseconds(15);
+    digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
+    digitalWrite(PIN_SDA, HIGH); delayMicroseconds(15);
 
-    // Reinicializar periférico I2C del ESP32
-    Wire.end();
-    delay(80);
+    // Paso 2: devolver pines a INPUT_PULLUP ANTES de que Wire tome control.
+    // Si quedan como OUTPUT el periférico I2C del ESP32 puede no reconocerlos.
+    pinMode(PIN_SCL, INPUT_PULLUP);
+    pinMode(PIN_SDA, INPUT_PULLUP);
+    delay(30);
+
+    // Paso 3: reinicializar periférico I2C del ESP32.
+    // No llamamos Wire.end() — en algunos ESP32 eso corrompe el hardware I2C;
+    // Wire.begin() reconfigura el periférico aunque ya estuviera inicializado.
     Wire.begin(PIN_SDA, PIN_SCL);
-    delay(120);
+    delay(100);
 
-    // Reinicializar controlador OLED y borrar pantalla.
-    // Dos intentos: el radio WiFi puede dejar al SSD1306 en un estado
-    // transitorio donde el primer begin() no completa la inicialización.
-    oled.begin();
-    delay(50);
+    // Paso 4: reinicializar controlador SSD1306 y borrar pantalla.
     oled.begin();
     oled.setContrast(220);
+    delay(50);
     oled.clearBuffer();
     oled.sendBuffer();
     delay(30);
-    // Segunda pasada de clearBuffer/sendBuffer para asegurar que el GRAM
-    // del controlador quede limpio (sin residuos de la pantalla anterior).
     oled.clearBuffer();
     oled.sendBuffer();
 }

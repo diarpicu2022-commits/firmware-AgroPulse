@@ -30,7 +30,8 @@ enum EstadoMenu {
 
 // ── Interfaz pública ───────────────────────────────────────────
 void displayInit();
-void displayReinit();   // Re-init I2C + OLED after WiFi radio startup
+void displayClear();    // Fast clear (I2C already healthy — no bus reset needed)
+void displayReinit();   // Full I2C bus recovery + OLED re-init after WiFi radio
 void displayMensaje(const char* l1, const char* l2 = "",
                     const char* l3 = "", const char* l4 = "");
 void displayRender(EstadoMenu estado, int cursorMenu,
