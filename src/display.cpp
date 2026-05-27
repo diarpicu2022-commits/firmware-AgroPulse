@@ -53,25 +53,17 @@ void displayClear() {
 
 // Re-initialize I2C bus and OLED controller after WiFi radio activity.
 //
-// Root cause of "OLED stuck on splash after reset":
-//   Wire.begin(sda, scl) is a NO-OP when Wire is already initialized with the
-//   same pins (ESP32 Arduino checks is_initiated and returns early with a
-//   "Bus already started" warning).  The I2C peripheral is therefore NEVER
-//   re-initialized, so if it was corrupted the display can't be updated.
-//
-// Fix: call Wire.end() first to clear the is_initiated flag, then do the
-// pin-level bus recovery (9 SCL pulses + STOP), then Wire.begin() — which
-// now actually reinitializes the hardware.  The pin recovery between end()
-// and begin() handles any transient GPIO state left by Wire.end().
+// Wire.end() is intentionally NOT called here.  On this ESP32 silicon revision
+// Wire.end() leaves the I2C peripheral in a state that Wire.begin() cannot
+// recover, breaking all subsequent I2C transactions permanently.  The ESP32
+// Arduino Wire.begin() with the same pins does log "Bus already started" and
+// skips the hardware reinit, but the peripheral is still functional — it only
+// needs the pin-level bus recovery (9 SCL pulses + STOP) to unlock the slave,
+// followed by oled.begin() to resend the SSD1306 initialization sequence.
 void displayReinit() {
-    // Paso 1: liberar periférico I2C → limpia is_initiated.
-    // Esto garantiza que Wire.begin() a continuación realmente reinicialice
-    // el hardware en lugar de retornar en la primera línea como no-op.
-    Wire.end();
-    delay(10);
-
-    // Paso 2: recuperación de bus a nivel de pin (IEEE I2C spec §3.1.16).
-    // Pulse SCL×9 + STOP para desbloquear slave y limpiar estado del bus.
+    // Paso 1: recuperación de bus a nivel de pin (IEEE I2C spec §3.1.16).
+    // Poner SDA en HIGH con pines en OUTPUT, pulsar SCL×9 para desbloquear
+    // al slave si está reteniendo SDA en LOW. Condición STOP al final.
     pinMode(PIN_SCL, OUTPUT);
     pinMode(PIN_SDA, OUTPUT);
     digitalWrite(PIN_SDA, HIGH);
@@ -85,16 +77,19 @@ void displayReinit() {
     digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
     digitalWrite(PIN_SDA, HIGH); delayMicroseconds(15);
 
-    // Paso 3: devolver pines a INPUT_PULLUP ANTES de que Wire tome control.
+    // Paso 2: devolver pines a INPUT_PULLUP ANTES de que Wire tome control.
+    // Si quedan como OUTPUT el periférico I2C del ESP32 puede no reconocerlos.
     pinMode(PIN_SCL, INPUT_PULLUP);
     pinMode(PIN_SDA, INPUT_PULLUP);
     delay(30);
 
-    // Paso 4: reinicializar periférico I2C — ahora sí se ejecuta completo.
+    // Paso 3: Wire.begin() — logs "already started" warning but the peripheral
+    // IS functional; the call is harmless and ensures frequency is correct.
     Wire.begin(PIN_SDA, PIN_SCL);
     delay(100);
 
-    // Paso 5: reinicializar controlador SSD1306 y borrar pantalla.
+    // Paso 4: reinicializar controlador SSD1306 (envía secuencia de init I2C)
+    // y borrar pantalla dos veces para garantizar frame limpio.
     oled.begin();
     oled.setContrast(220);
     delay(50);
