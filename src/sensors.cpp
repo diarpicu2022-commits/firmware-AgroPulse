@@ -45,6 +45,18 @@ static void initDHTObjects() {
             s_dht11->begin();
             s_dht11InitTime = millis();
             Serial.printf("[Sensors] DHT11 en GPIO %d\n", pin);
+            // Wakeup sequence: send 3 start pulses so the sensor completes
+            // any pending measurement from before the ESP32 soft-reset and
+            // returns to idle.  Without this the sensor stays stuck and never
+            // responds to read() calls until a full power cycle.
+            for (int w = 0; w < 3; w++) {
+                pinMode(pin, OUTPUT);
+                digitalWrite(pin, LOW);
+                delay(20);
+                pinMode(pin, INPUT_PULLUP);
+                delay(260);
+            }
+            Serial.printf("[Sensors] DHT11 wakeup OK (GPIO %d)\n", pin);
         }
     }
     // Fallback: siempre tener DHT22 disponible
@@ -168,8 +180,14 @@ static void refreshDHTCache() {
         if ((millis() - s_dht11InitTime) < 3000) {
             s_t11 = NAN; s_h11 = NAN;
         } else {
+            // DHT11 uses bit-banging; WiFi interrupt handlers on Core 1 corrupt
+            // the pulse-width timing, causing CRC errors → NaN.  Disabling
+            // interrupts on Core 1 for the ~4 ms read window prevents this.
+            // The WiFi stack continues unaffected on Core 0.
+            noInterrupts();
             float t = s_dht11->readTemperature();
             float h = s_dht11->readHumidity();
+            interrupts();
             s_t11 = (!isnan(t) && t >= 0.0f && t < 60.0f)   ? t : NAN;
             s_h11 = (!isnan(h) && h >= 0.0f && h <= 100.0f) ? h : NAN;
         }

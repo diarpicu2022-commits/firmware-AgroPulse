@@ -637,14 +637,22 @@ static QueueHandle_t s_reportQueue = nullptr;
 static void httpTask(void*) {
     unsigned long lastSend = 0;
     for (;;) {
-        // 1. Registrar sensores en el backend una vez por sesión
-        //    (POST si no existen, PUT si ya tienen backendId)
+        // 1. Registrar sensores en el backend UNA VEZ por sesión.
+        //    Si todos los sensores ya tienen backendId (asignado por commDownloadConfig)
+        //    se salta el bucle: evita llamadas PUT a /api/sensors/{id} sin JWT que
+        //    devuelven 403 porque el endpoint requiere autenticación de usuario.
         if (!s_sensorsRegistered &&
             s_status.wifiConnected && !s_status.backendUrl.isEmpty() &&
             s_status.greenhouseId > 0) {
+            bool allHaveId = true;
             for (int i = 0; i < NUM_SENSORES; i++) {
-                commReportSensor(i);
-                vTaskDelay(pdMS_TO_TICKS(300));
+                if (sensores[i].backendId <= 0) { allHaveId = false; break; }
+            }
+            if (!allHaveId) {
+                for (int i = 0; i < NUM_SENSORES; i++) {
+                    commReportSensor(i);
+                    vTaskDelay(pdMS_TO_TICKS(300));
+                }
             }
             s_sensorsRegistered = true;
         }
