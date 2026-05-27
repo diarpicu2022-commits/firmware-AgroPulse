@@ -41,7 +41,6 @@ static ActuatorThresholds g_thresholds;
 static ActuatorState      g_autoState;
 static unsigned long      g_tLectura    = 0;
 static unsigned long      g_tUI         = 0;
-static unsigned long      g_tOledReinit = 0;   // recuperación periódica de I2C
 static int               g_homePage     = 0;   // 0 = página 1, 1 = página 2
 
 // ── Debounce de botones ───────────────────────────────────────
@@ -338,15 +337,10 @@ void loop() {
     // 2. Máquina de estados del menú (cada ciclo)
     procesarMenu();
 
-    // 3. Recuperación periódica del bus I2C (cada 30 s los primeros 5 min,
-    //    luego cada 5 min). El radio WiFi puede corromper el bus durante la
-    //    operación normal; reinits frecuentes al arrancar ayudan a estabilizar.
-    // Forzar g_tUI = 0 asegura un displayRender inmediato tras el reinit.
-    if (ahora - g_tOledReinit >= (ahora < 300000UL ? 30000UL : 300000UL)) {
-        displayReinit();
-        g_tUI         = 0;     // dispara displayRender en la próxima iteración
-        g_tOledReinit = ahora;
-    }
+    // 3. (Recuperación periódica de I2C eliminada: Wire.begin() en loop()
+    //    causa Interrupt WDT cuando coincide con HTTP responses en Core 0.
+    //    El display se estabiliza en setup() con múltiples displayReinit();
+    //    si se cuelga en operación normal, un reinicio del ESP32 lo resuelve.)
 
     // 4. Lectura de sensores cada INTERVALO_LECTURA_MS
     if (ahora - g_tLectura >= INTERVALO_LECTURA_MS) {
