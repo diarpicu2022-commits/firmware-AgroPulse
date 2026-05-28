@@ -699,7 +699,8 @@ void commReiniciarWifi() {
     ESP.restart();        // en el siguiente boot el portal se abre
 }
 
-// ── commSendLocation() — PUT /api/greenhouses/{ghId} ─────────
+// ── commSendLocation() — PATCH /api/greenhouses/{ghId}/location ──────
+// Usa endpoint dedicado para dispositivos: no requiere JWT ni X-User-Id.
 bool commSendLocation(double lat, double lng) {
     if (!s_status.wifiConnected || s_status.backendUrl.isEmpty() || s_status.greenhouseId <= 0) {
         Serial.println("[GPS] Sin WiFi/URL/GH ID — ubicacion no enviada.");
@@ -714,11 +715,13 @@ bool commSendLocation(double lat, double lng) {
 
     HTTP_LOCK();
     HTTPClient http;
-    String url = s_status.backendUrl + "/api/greenhouses/" + String(s_status.greenhouseId);
+    String url = s_status.backendUrl + "/api/greenhouses/" +
+                 String(s_status.greenhouseId) + "/location";
     http.begin(s_cliente, url);
     http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Device-Source", DEVICE_ID);
     http.setTimeout(TIMEOUT_HTTP_MS);
-    int code = http.PUT(payload);
+    int code = http.PATCH(payload);
     http.end();
     HTTP_UNLOCK();
 
