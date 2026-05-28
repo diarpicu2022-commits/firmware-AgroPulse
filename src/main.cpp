@@ -44,9 +44,12 @@ static unsigned long      g_tUI         = 0;
 static int               g_homePage     = 0;   // 0 = página 1, 1 = página 2
 
 // ── Debounce de botones ───────────────────────────────────────
-// UP/DOWN tienen auto-repeat al mantener: 400 ms de espera, luego cada 120 ms
-#define BTN_REPEAT_DELAY_MS  400
-#define BTN_REPEAT_RATE_MS   120
+// DEBOUNCE_MS subido de 20→50: GPIO16/17 son limpios pero 50 ms absorbe
+// cualquier rebote mecánico residual sin latencia perceptible.
+// Auto-repeat: 600 ms de espera inicial, luego cada 250 ms (antes 120 ms
+// era demasiado rápido y el usuario perdía el item deseado).
+#define BTN_REPEAT_DELAY_MS  600
+#define BTN_REPEAT_RATE_MS   250
 
 struct Boton {
     int           pin;

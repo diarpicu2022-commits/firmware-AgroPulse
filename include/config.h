@@ -40,13 +40,15 @@
 #define PIN_LED_STATUS   2    // LED integrado del ESP32
 
 // ── Pines botones (INPUT_PULLUP — presión = LOW) ───────────────
-// GPIO12-15 son pines JTAG (MTDI/MTCK/MTMS/MTDO) del ESP32.
-// El subsistema JTAG interfiere con su uso como entradas digitales normales,
-// especialmente GPIO13 (MTCK) y GPIO14 (MTMS) con WiFi activo.
-// GPIO25 y GPIO23 son pines completamente limpios: sin JTAG, sin strapping,
-// sin ADC2, sin conflicto con flash ni PSRAM.
-#define PIN_BTN_UP      25    // era 13 — GPIO13 es JTAG MTCK, interferencia con WiFi
-#define PIN_BTN_DOWN    23    // era 14 — GPIO14 es JTAG MTMS, interferencia con WiFi
+// GPIO32/33 (ADC1) funcionan correctamente con WiFi activo.
+// GPIO25 ERA el pin de UP pero es ADC2_CH8: el radio WiFi inyecta
+// ruido en todos los pines ADC2 durante transmisión, lo que reseteaba
+// el timer de debounce y hacía el botón intermitente ("funciona cuando quiere").
+// GPIO16/17 son UART2 RX/TX, libres en WROOM-32D: sin ADC2, sin JTAG,
+// sin SPI, sin strapping — los pines más limpios disponibles.
+// CABLEAR: mover jumpers de GPIO25→16 y GPIO23→17.
+#define PIN_BTN_UP      16    // era 25 — GPIO25 es ADC2_CH8, interferencia WiFi
+#define PIN_BTN_DOWN    17    // era 23 — GPIO23 es VSPI_MOSI, posible ruido SPI
 #define PIN_BTN_SELECT  32
 #define PIN_BTN_BACK    33
 
@@ -62,7 +64,7 @@
 #define INTERVALO_LECTURA_MS   10000   // releer sensores cada 10 s
 #define INTERVALO_ENVIO_MS     30000   // enviar al backend cada 30 s
 #define INTERVALO_UI_MS          300   // refresco OLED cada 300 ms
-#define DEBOUNCE_MS               20   // debounce de botones
+#define DEBOUNCE_MS               50   // debounce de botones (50ms → tolera ruido ADC2/WiFi)
 #define DHT_MAX_INTENTOS           3   // reintentos DHT antes de marcar desconectado
 #define TIMEOUT_HTTP_MS         3000   // timeout peticiones HTTP
 
