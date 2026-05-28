@@ -63,6 +63,11 @@ void displayInit() {
         Serial.println("[Display] ERROR: SSD1306 no responde tras 5 intentos — verifica cableado VCC/GND/SDA/SCL!");
     }
 
+    // Timeout de 30 ms en Wire: si la I2C se cuelga (EMI de relays, etc.)
+    // Wire.endTransmission() retorna en <30 ms en lugar de bloquear para
+    // siempre → previene el Interrupt WDT timeout en Core 1.
+    Wire.setTimeOut(30);
+
     bool ok = oled.begin();
     oled.setContrast(220);
     Serial.printf("[Display] OLED %s\n", ok ? "iniciado OK." : "FALLO init!");
@@ -107,6 +112,7 @@ void displayReinit() {
     // y queda texto fantasma (ej. "Conectando WiFi" encima de los datos).
     // Solución: 8 ciclos de clearBuffer+sendBuffer. Aunque algún ciclo falle
     // en páginas individuales, los siguientes las sobreescriben.
+    Wire.setTimeOut(30);   // re-aplicar timeout tras bus recovery
     bool ok = oled.begin();
     if (!ok) Serial.println("[Display] Reinit FALLO — SSD1306 no responde!");
     oled.setContrast(220);

@@ -356,6 +356,14 @@ void setup() {
 // ════════════════════════════════════════════════════════════════
 //  LOOP — completamente no bloqueante (3 intervalos independientes)
 // ════════════════════════════════════════════════════════════════
+
+// Tiempo máximo sin actualizar el display antes de considerar I2C colgada.
+// Wire.setTimeOut(30ms) hace que cada operación falle rápido, pero si falla
+// silenciosamente varias veces seguidas, esta ventana dispara un displayReinit.
+#define DISPLAY_HANG_MS  5000UL   // 5 s sin render exitoso → reinit I2C
+
+static unsigned long g_tDisplayOk = 0;  // última vez que el render completó bien
+
 void loop() {
     unsigned long ahora = millis();
 
@@ -365,10 +373,16 @@ void loop() {
     // 2. Máquina de estados del menú (cada ciclo)
     procesarMenu();
 
-    // 3. (Recuperación periódica de I2C eliminada: Wire.begin() en loop()
-    //    causa Interrupt WDT cuando coincide con HTTP responses en Core 0.
-    //    El display se estabiliza en setup() con múltiples displayReinit();
-    //    si se cuelga en operación normal, un reinicio del ESP32 lo resuelve.)
+    // 3. Watchdog de display: si llevamos DISPLAY_HANG_MS sin renderizar,
+    //    la I2C posiblemente está colgada por EMI de relays u otro ruido.
+    //    displayReinit() hace bus-recovery + re-init SSD1306.
+    //    Wire.setTimeOut(30) (en display.cpp) asegura que esta llamada
+    //    también retorne rápido si el bus sigue inestable.
+    if ((ahora - g_tDisplayOk) > DISPLAY_HANG_MS && g_tDisplayOk > 0) {
+        Serial.println("[Display] Watchdog: I2C posiblemente colgada — reinit");
+        displayReinit();
+        g_tDisplayOk = ahora;  // reiniciar conteo
+    }
 
     // 4. Lectura de sensores cada INTERVALO_LECTURA_MS
     if (ahora - g_tLectura >= INTERVALO_LECTURA_MS) {
@@ -383,7 +397,8 @@ void loop() {
     // 5. Actualización del OLED cada INTERVALO_UI_MS
     if (ahora - g_tUI >= INTERVALO_UI_MS) {
         displayRender(estadoActual, cursorMenu, cursorActuador, cursorAngulo, g_homePage, g_editGhId);
-        g_tUI = ahora;
+        g_tUI     = ahora;
+        g_tDisplayOk = ahora;  // render completó sin bloquear el loop
     }
 
     // 6. Comandos de configuración por Serial
