@@ -90,9 +90,11 @@ static void leerBotones() {
         if (lectura != botones[i].estadoFiltrado) {
             // Lectura apunta a un nuevo estado: acumular muestras
             if (botones[i].sampleCount < 255) botones[i].sampleCount++;
-            // Fijar tCambio SOLO en el primer ciclo de desacuerdo
-            // → spikes del WiFi no resetean el timer aunque drenen sampleCount
-            if (botones[i].sampleCount == 1) botones[i].tCambio = ahora;
+            // Fijar tCambio al llegar a 5 muestras consecutivas.
+            // Spikes de ruido WiFi en GPIO25 (ADC2) duran 1-3 ciclos →
+            // nunca alcanzan 5 → timer no se activa → botón ignorado.
+            // Presión real acumula 5 en ~50 µs (invisible para el usuario).
+            if (botones[i].sampleCount == 5) botones[i].tCambio = ahora;
 
             if ((ahora - botones[i].tCambio) >= DEBOUNCE_MS) {
                 botones[i].estadoFiltrado = lectura;
@@ -335,6 +337,12 @@ void setup() {
     // sus requests, así que httpTask (Core 0) y loop() (Core 1) no compiten.
     // El mutex en comm.cpp protege accesos concurrentes desde el menú.
     commStartTask();
+
+    // Re-aplicar GPIO de actuadores después de arrancar la tarea HTTP.
+    // El stack WiFi puede reclamar GPIO18 (VSPI_CLK) u otros pines SPI
+    // durante la inicialización del radio. gpio_reset_pin() en
+    // actuatorsSetupGPIO() desconecta los periféricos y restaura OUTPUT.
+    actuatorsSetupGPIO();
 
     // Re-aplicar INPUT_PULLUP en botones por si commDownloadConfig() o
     // actuatorsSetupGPIO() modificaron algún GPIO compartido.

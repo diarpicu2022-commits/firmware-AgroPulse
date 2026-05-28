@@ -123,6 +123,11 @@ void actuatorsSetupGPIO() {
             s_servo.attach(actuadores[i].pin, 500, 2400);
             s_servo.write(90);
         } else {
+            // gpio_reset_pin desconecta el GPIO de cualquier periférico
+            // (SPI/LEDC/PWM) que pudiera haberlo tomado, p.ej. GPIO18=VSPI_CLK.
+            // Sin esto, el ESP32 puede dejar GPIO18 bajo control SPI y hacer
+            // que el relay LED parpadee al ritmo del reloj SPI.
+            gpio_reset_pin((gpio_num_t)actuadores[i].pin);
             pinMode(actuadores[i].pin, OUTPUT);
             digitalWrite(actuadores[i].pin, actuadores[i].activeLow ? HIGH : LOW);
         }
