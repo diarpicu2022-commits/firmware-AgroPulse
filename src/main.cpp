@@ -44,22 +44,29 @@ static unsigned long      g_tUI         = 0;
 static int               g_homePage     = 0;   // 0 = página 1, 1 = página 2
 
 // ── Debounce de botones ───────────────────────────────────────
-// DEBOUNCE_MS subido de 20→50: GPIO16/17 son limpios pero 50 ms absorbe
-// cualquier rebote mecánico residual sin latencia perceptible.
-// Auto-repeat: 600 ms de espera inicial, luego cada 250 ms (antes 120 ms
-// era demasiado rápido y el usuario perdía el item deseado).
+// GPIO25 (UP) es ADC2_CH8: el radio WiFi genera spikes breves (1-5 ciclos)
+// que resetean el timer clásico tCambio, haciendo UP/DOWN intermitentes.
+// Solución: debounce por acumulación de muestras + timer de inicio.
+//   - sampleCount se incrementa cada ciclo en que lectura != estadoFiltrado
+//   - tCambio se fija SOLO en el primer ciclo de desacuerdo (sampleCount==1)
+//   - spikes breves del WiFi (~10 ciclos) drenan sampleCount pero NO
+//     resetean tCambio → el timer sigue acumulando hacia DEBOUNCE_MS
+//   - Confirmación cuando (ahora - tCambio) >= DEBOUNCE_MS
+// Auto-repeat: 600 ms inicial, 250 ms de repetición (antes 120 ms era
+// demasiado rápido y el usuario perdía el item deseado).
 #define BTN_REPEAT_DELAY_MS  600
 #define BTN_REPEAT_RATE_MS   250
 
 struct Boton {
     int           pin;
     bool          estadoFiltrado;
-    bool          estadoAnterior;
-    unsigned long tCambio;
-    bool          disparado;   // true solo el ciclo en que se detectó la presión
-    bool          conRepeat;   // true = emite disparos mientras se mantiene
+    bool          estadoAnterior;   // historial raw (backup)
+    unsigned long tCambio;          // timestamp del primer ciclo de desacuerdo
+    bool          disparado;        // true solo el ciclo en que se detectó la presión
+    bool          conRepeat;        // true = emite disparos mientras se mantiene
     unsigned long tPrimerDisparo;
     unsigned long tUltimoRepeat;
+    uint8_t       sampleCount;      // muestras acumuladas hacia el nuevo estado
 };
 
 #define BTN_UP     0
@@ -68,10 +75,10 @@ struct Boton {
 #define BTN_BACK   3
 
 static Boton botones[4] = {
-    {PIN_BTN_UP,     false, false, 0, false, true,  0, 0},
-    {PIN_BTN_DOWN,   false, false, 0, false, true,  0, 0},
-    {PIN_BTN_SELECT, false, false, 0, false, false, 0, 0},
-    {PIN_BTN_BACK,   false, false, 0, false, false, 0, 0},
+    {PIN_BTN_UP,     false, false, 0, false, true,  0, 0, 0},
+    {PIN_BTN_DOWN,   false, false, 0, false, true,  0, 0, 0},
+    {PIN_BTN_SELECT, false, false, 0, false, false, 0, 0, 0},
+    {PIN_BTN_BACK,   false, false, 0, false, false, 0, 0, 0},
 };
 
 static void leerBotones() {
@@ -80,17 +87,25 @@ static void leerBotones() {
         bool lectura = (digitalRead(botones[i].pin) == LOW);
         botones[i].disparado = false;
 
-        if (lectura != botones[i].estadoAnterior) botones[i].tCambio = ahora;
+        if (lectura != botones[i].estadoFiltrado) {
+            // Lectura apunta a un nuevo estado: acumular muestras
+            if (botones[i].sampleCount < 255) botones[i].sampleCount++;
+            // Fijar tCambio SOLO en el primer ciclo de desacuerdo
+            // → spikes del WiFi no resetean el timer aunque drenen sampleCount
+            if (botones[i].sampleCount == 1) botones[i].tCambio = ahora;
 
-        if ((ahora - botones[i].tCambio) >= DEBOUNCE_MS) {
-            if (lectura != botones[i].estadoFiltrado) {
+            if ((ahora - botones[i].tCambio) >= DEBOUNCE_MS) {
                 botones[i].estadoFiltrado = lectura;
+                botones[i].sampleCount    = 0;
                 if (lectura) {
-                    botones[i].disparado       = true;
-                    botones[i].tPrimerDisparo  = ahora;
-                    botones[i].tUltimoRepeat   = ahora;
+                    botones[i].disparado      = true;
+                    botones[i].tPrimerDisparo = ahora;
+                    botones[i].tUltimoRepeat  = ahora;
                 }
             }
+        } else {
+            // Lectura coincide con estado estable: drenar contador
+            if (botones[i].sampleCount > 0) botones[i].sampleCount--;
             // Auto-repeat mientras se mantiene presionado (solo botones con conRepeat)
             if (botones[i].conRepeat && botones[i].estadoFiltrado && !botones[i].disparado) {
                 if ((ahora - botones[i].tPrimerDisparo) >= BTN_REPEAT_DELAY_MS &&

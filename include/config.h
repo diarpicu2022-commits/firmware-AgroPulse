@@ -40,15 +40,13 @@
 #define PIN_LED_STATUS   2    // LED integrado del ESP32
 
 // ── Pines botones (INPUT_PULLUP — presión = LOW) ───────────────
-// GPIO32/33 (ADC1) funcionan correctamente con WiFi activo.
-// GPIO25 ERA el pin de UP pero es ADC2_CH8: el radio WiFi inyecta
-// ruido en todos los pines ADC2 durante transmisión, lo que reseteaba
-// el timer de debounce y hacía el botón intermitente ("funciona cuando quiere").
-// GPIO16/17 son UART2 RX/TX, libres en WROOM-32D: sin ADC2, sin JTAG,
-// sin SPI, sin strapping — los pines más limpios disponibles.
-// CABLEAR: mover jumpers de GPIO25→16 y GPIO23→17.
-#define PIN_BTN_UP      16    // era 25 — GPIO25 es ADC2_CH8, interferencia WiFi
-#define PIN_BTN_DOWN    17    // era 23 — GPIO23 es VSPI_MOSI, posible ruido SPI
+// GPIO25 (UP) es ADC2_CH8: WiFi inyecta spikes de ruido en ADC2 durante
+// transmisión. El debounce clásico fallaba porque cada spike reseteaba
+// tCambio. Solución por software: debounce con sampleCount (ver main.cpp)
+// que es inmune a spikes breves. No se requiere cambio de hardware.
+// GPIO32/33 son ADC1 y no tienen este problema (SELECT/BACK funcionan bien).
+#define PIN_BTN_UP      25    // ADC2_CH8 — debounce por sampleCount lo maneja
+#define PIN_BTN_DOWN    23    // VSPI_MOSI — también protegido por sampleCount
 #define PIN_BTN_SELECT  32
 #define PIN_BTN_BACK    33
 
