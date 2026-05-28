@@ -23,7 +23,7 @@ static void actuatorsLoadDefaults() {
         {"Motobomba", "PUMP",  PIN_RELE_BOMBA, false, true,  true},
         {"Motor",     "MOTOR", PIN_RELE_MOTOR, false, true,  true},
         {"Servo",     "SERVO", PIN_SERVO,      true,  false, false},
-        {"LED Strip", "LED",   PIN_LED1,       false, false, false},
+        {"LED Strip", "LED",   PIN_LED1,       false, true,  true},
     };
     for (int i = 0; i < 4; i++) {
         strncpy(actuadores[i].nombre, D[i].nm, 31);
@@ -78,7 +78,7 @@ void actuatorsLoadDynamic() {
         bool defaultAL = (strcmp(t,"PUMP")==0||strcmp(t,"MOTOR")==0||strcmp(t,"FAN")==0||
                           strcmp(t,"RELAY")==0||strcmp(t,"EXTRACTOR")==0||
                           strcmp(t,"WATER_PUMP")==0||strcmp(t,"HEAT_GENERATOR")==0||
-                          strcmp(t,"DOOR")==0);
+                          strcmp(t,"DOOR")==0||strcmp(t,"LED")==0);
         actuadores[i].activeLow = p.getBool(k, defaultAL);
         actuadores[i].esServo = (strcmp(t, "SERVO") == 0);
         actuadores[i].esRele  = (strcmp(t, "RELAY") == 0 || strcmp(t, "PUMP")  == 0 ||

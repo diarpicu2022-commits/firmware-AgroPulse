@@ -9,29 +9,63 @@ static U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
 static const uint8_t ICO_TEMP[]   = {0x0C, 0x12, 0x12, 0x1E, 0x1E, 0x3F, 0x3F, 0x1E};
 static const uint8_t ICO_GOTA[]   = {0x04, 0x0E, 0x1F, 0x3F, 0x3F, 0x3F, 0x1E, 0x00};
 static const uint8_t ICO_PLANTA[] = {0x08, 0x1C, 0x3E, 0x3E, 0x08, 0x08, 0x1C, 0x00};
+static const uint8_t ICO_RAYO[]   = {0x18, 0x30, 0x7E, 0x1C, 0x0E, 0x7E, 0x06, 0x00};
 
-void displayInit() {
-    // Recuperación preventiva del bus I2C antes de Wire.begin():
-    // Si la sesión anterior terminó con el bus atascado (SDA en LOW),
-    // Wire.begin() falla silenciosamente y el SSD1306 muestra el GRAM previo
-    // (el splash) para siempre. Los 9 pulsos de SCL desbloquean al slave
-    // y la condición STOP libera el bus antes de inicializar Wire.
+// Ejecuta la secuencia de 9 pulsos SCL + condición STOP para desbloquear
+// cualquier slave I2C que esté reteniendo SDA en LOW.
+static void i2cBusRecovery() {
     pinMode(PIN_SCL, OUTPUT);
     pinMode(PIN_SDA, OUTPUT);
     digitalWrite(PIN_SDA, HIGH);
+    digitalWrite(PIN_SCL, HIGH);
     for (int i = 0; i < 9; i++) {
-        digitalWrite(PIN_SCL, LOW);  delayMicroseconds(10);
-        digitalWrite(PIN_SCL, HIGH); delayMicroseconds(10);
+        digitalWrite(PIN_SCL, LOW);  delayMicroseconds(15);
+        digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
     }
-    digitalWrite(PIN_SDA, LOW);  delayMicroseconds(10);
-    digitalWrite(PIN_SCL, HIGH); delayMicroseconds(10);
-    digitalWrite(PIN_SDA, HIGH);
-    delay(20);
+    // Condición STOP: SDA sube mientras SCL está HIGH
+    digitalWrite(PIN_SDA, LOW);  delayMicroseconds(15);
+    digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
+    digitalWrite(PIN_SDA, HIGH); delayMicroseconds(15);
+    // Devolver pines a INPUT_PULLUP ANTES de que Wire tome control
+    pinMode(PIN_SCL, INPUT_PULLUP);
+    pinMode(PIN_SDA, INPUT_PULLUP);
+    delay(30);
+}
 
+void displayInit() {
+    // SSD1306 requiere hasta 300 ms tras VCC para aceptar comandos I2C.
+    // Esperar antes de intentar recuperar el bus evita fallos de timing
+    // cuando el ESP32 arranca más rápido que el módulo OLED.
+    delay(300);
+
+    i2cBusRecovery();
     Wire.begin(PIN_SDA, PIN_SCL);
-    oled.begin();
+
+    // Reintento con hasta 5 ciclos de recuperación + delay creciente.
+    // Cubre módulos lentos, cold-start tras corte de energía o bus atascado.
+    bool found = false;
+    for (int attempt = 0; attempt < 5 && !found; attempt++) {
+        if (attempt > 0) {
+            Serial.printf("[Display] Reintento %d/4 — bus recovery...\n", attempt);
+            i2cBusRecovery();
+            Wire.begin(PIN_SDA, PIN_SCL);
+            delay(attempt * 150);  // 150, 300, 450, 600 ms entre intentos
+        }
+        Wire.beginTransmission(0x3C);
+        if (Wire.endTransmission() == 0) { found = true; break; }
+        Wire.beginTransmission(0x3D);
+        if (Wire.endTransmission() == 0) { found = true; break; }
+    }
+
+    if (found) {
+        Serial.println("[Display] SSD1306 detectado en bus I2C.");
+    } else {
+        Serial.println("[Display] ERROR: SSD1306 no responde tras 5 intentos — verifica cableado VCC/GND/SDA/SCL!");
+    }
+
+    bool ok = oled.begin();
     oled.setContrast(220);
-    Serial.println("[Display] OLED iniciado OK.");
+    Serial.printf("[Display] OLED %s\n", ok ? "iniciado OK." : "FALLO init!");
 
     oled.clearBuffer();
     oled.setFont(u8g2_font_9x18B_tr);
@@ -61,43 +95,27 @@ void displayClear() {
 // needs the pin-level bus recovery (9 SCL pulses + STOP) to unlock the slave,
 // followed by oled.begin() to resend the SSD1306 initialization sequence.
 void displayReinit() {
-    // Paso 1: recuperación de bus a nivel de pin (IEEE I2C spec §3.1.16).
-    // Poner SDA en HIGH con pines en OUTPUT, pulsar SCL×9 para desbloquear
-    // al slave si está reteniendo SDA en LOW. Condición STOP al final.
-    pinMode(PIN_SCL, OUTPUT);
-    pinMode(PIN_SDA, OUTPUT);
-    digitalWrite(PIN_SDA, HIGH);
-    digitalWrite(PIN_SCL, HIGH);
-    for (int i = 0; i < 9; i++) {
-        digitalWrite(PIN_SCL, LOW);  delayMicroseconds(15);
-        digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
-    }
-    // Condición STOP: SDA sube mientras SCL está HIGH
-    digitalWrite(PIN_SDA, LOW);  delayMicroseconds(15);
-    digitalWrite(PIN_SCL, HIGH); delayMicroseconds(15);
-    digitalWrite(PIN_SDA, HIGH); delayMicroseconds(15);
-
-    // Paso 2: devolver pines a INPUT_PULLUP ANTES de que Wire tome control.
-    // Si quedan como OUTPUT el periférico I2C del ESP32 puede no reconocerlos.
-    pinMode(PIN_SCL, INPUT_PULLUP);
-    pinMode(PIN_SDA, INPUT_PULLUP);
-    delay(30);
-
-    // Paso 3: Wire.begin() — logs "already started" warning but the peripheral
-    // IS functional; the call is harmless and ensures frequency is correct.
+    // Recuperación de bus I2C + reinit del controlador SSD1306 tras actividad WiFi.
+    // Wire.end() NO se llama: en este ESP32 deja el periférico en estado irrecuperable.
+    i2cBusRecovery();
     Wire.begin(PIN_SDA, PIN_SCL);
     delay(100);
 
-    // Paso 4: reinicializar controlador SSD1306 (envía secuencia de init I2C)
-    // y borrar pantalla dos veces para garantizar frame limpio.
-    oled.begin();
+    // Paso 4: reinicializar controlador SSD1306.
+    // oled.begin() envía init + u8g2_ClearDisplay() internamente, pero si el
+    // bus I2C está inestable post-WiFi, algunas páginas de GRAM no se limpian
+    // y queda texto fantasma (ej. "Conectando WiFi" encima de los datos).
+    // Solución: 8 ciclos de clearBuffer+sendBuffer. Aunque algún ciclo falle
+    // en páginas individuales, los siguientes las sobreescriben.
+    bool ok = oled.begin();
+    if (!ok) Serial.println("[Display] Reinit FALLO — SSD1306 no responde!");
     oled.setContrast(220);
-    delay(50);
-    oled.clearBuffer();
-    oled.sendBuffer();
-    delay(30);
-    oled.clearBuffer();
-    oled.sendBuffer();
+    delay(80);
+    for (int i = 0; i < 8; i++) {
+        oled.clearBuffer();
+        oled.sendBuffer();
+        delay(15);
+    }
 }
 
 void displayMensaje(const char* l1, const char* l2, const char* l3, const char* l4) {
@@ -113,8 +131,9 @@ void displayMensaje(const char* l1, const char* l2, const char* l3, const char* 
 // ── Helpers de dibujo ─────────────────────────────────────────
 
 static void dibujarIcono(int x, int y, const char* tipo) {
-    if      (strcmp(tipo, "TEMP") == 0)   oled.drawXBM(x, y, 8, 8, ICO_TEMP);
-    else if (strcmp(tipo, "GOTA") == 0)   oled.drawXBM(x, y, 8, 8, ICO_GOTA);
+    if      (strcmp(tipo, "TEMP")   == 0) oled.drawXBM(x, y, 8, 8, ICO_TEMP);
+    else if (strcmp(tipo, "GOTA")   == 0) oled.drawXBM(x, y, 8, 8, ICO_GOTA);
+    else if (strcmp(tipo, "RAYO")   == 0) oled.drawXBM(x, y, 8, 8, ICO_RAYO);
     else                                   oled.drawXBM(x, y, 8, 8, ICO_PLANTA);
 }
 
@@ -160,10 +179,16 @@ static void dibujarHome(int pagina) {
             alguno = true;
             bool esHumedad = (strcmp(sensores[i].icono, "GOTA") == 0 ||
                               strcmp(sensores[i].tipo,  "SOIL_MOISTURE") == 0);
+            bool esCorriente = (strcmp(sensores[i].tipo, "CURRENT") == 0);
             if (esHumedad) {
                 sprintf(buf, "%-9s%3.0f%%", sensores[i].nombre, sensores[i].valor);
                 oled.drawStr(10, y, buf);
                 dibujarBarra(95, y - 7, 32, 8, sensores[i].valor);
+            } else if (esCorriente) {
+                // Muestra corriente y potencia en la misma línea: "Corrient 1.5A 18W"
+                float watts = ACS712_VOLTAGE * sensores[i].valor;
+                sprintf(buf, "%-8s %.1fA%3.0fW", sensores[i].nombre, sensores[i].valor, watts);
+                oled.drawStr(10, y, buf);
             } else {
                 sprintf(buf, "%-9s%5.1f%s", sensores[i].nombre, sensores[i].valor, sensores[i].unidad);
                 oled.drawStr(10, y, buf);
@@ -171,7 +196,10 @@ static void dibujarHome(int pagina) {
         }
         y += 13;
     }
-    if (!alguno && inicio == 0) {
+    // Mostrar "Detectando..." solo los primeros 8 s (antes de la primera
+    // lectura de sensores en loop). Después de eso, los sensores sin datos
+    // muestran "---" y el texto nunca queda pegado como píxel fantasma.
+    if (!alguno && inicio == 0 && millis() < 8000) {
         oled.drawStr(15, 40, "Detectando...");
     }
 

@@ -22,6 +22,7 @@ static void setSensorMeta(int i) {
     else if (strcmp(t, "HUMIDITY")          == 0 ||
              strcmp(t, "HUMIDITY_EXTERNAL") == 0) { strcpy(sensores[i].unidad, "%");   strcpy(sensores[i].icono, "GOTA");   }
     else if (strcmp(t, "SOIL_MOISTURE")== 0) { strcpy(sensores[i].unidad, "%");   strcpy(sensores[i].icono, "PLANTA"); }
+    else if (strcmp(t, "CURRENT")      == 0) { strcpy(sensores[i].unidad, "A");   strcpy(sensores[i].icono, "RAYO");   }
     else if (strcmp(t, "LIGHT")        == 0) { strcpy(sensores[i].unidad, "lx");  strcpy(sensores[i].icono, "TEMP");   }
     else if (strcmp(t, "CO2")          == 0) { strcpy(sensores[i].unidad, "ppm"); strcpy(sensores[i].icono, "GOTA");   }
     else                                     { strcpy(sensores[i].unidad, "");    strcpy(sensores[i].icono, "TEMP");   }
@@ -74,15 +75,16 @@ static void initDHTObjects() {
 }
 
 static void sensorsLoadDefaults() {
-    NUM_SENSORES = 5;
-    const struct { const char* nm; const char* ty; const char* pr; int gp; } D[5] = {
+    NUM_SENSORES = 6;
+    const struct { const char* nm; const char* ty; const char* pr; int gp; } D[6] = {
         {"Temp DHT22", "TEMPERATURE_INTERNAL", "DHT22", PIN_DHT22},
         {"Hum  DHT22", "HUMIDITY",             "DHT22", PIN_DHT22},
         {"Temp DHT11", "TEMPERATURE_EXTERNAL", "DHT11", PIN_DHT11},
-        {"Hum  DHT11", "HUMIDITY_EXTERNAL",   "DHT11", PIN_DHT11},
-        {"Hum  Suelo", "SOIL_MOISTURE",        "ADC",   PIN_SUELO},
+        {"Hum  DHT11", "HUMIDITY_EXTERNAL",    "DHT11", PIN_DHT11},
+        {"Hum  Suelo", "SOIL_MOISTURE",        "DIGITAL", PIN_SUELO},
+        {"Corriente",  "CURRENT",              "ADC",   PIN_CORRIENTE},
     };
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         strncpy(sensores[i].nombre,   D[i].nm, 31);
         strncpy(sensores[i].tipo,     D[i].ty, 23);
         strncpy(sensores[i].protocol, D[i].pr, 15);
@@ -216,20 +218,41 @@ SensorReadings sensorsRead() {
             if (!isnan(val))
                 ok = isTemp ? (val > 0.0f && val < 60.0f) : (val >= 0.0f && val <= 100.0f);
         } else if (strcmp(pr, "ADC") == 0 || strcmp(pr, "ANALOG") == 0) {
-            int raw  = analogRead(sensores[i].gpioPin);
-            bool inR = (raw > ADC_MIN && raw < ADC_MAX);
-            if (strcmp(ty, "SOIL_MOISTURE") == 0) {
-                val = inR ? (float)map(raw, 4095, 0, 0, 100) : NAN;
-            } else if (isTemp) {
-                float t = raw * (3.3f / 4095.0f) * 100.0f;
-                val = (inR && t > 0.0f && t < 85.0f) ? t : NAN;
+            if (strcmp(ty, "CURRENT") == 0) {
+                // ACS712: promedia ACS712_SAMPLES lecturas para reducir ruido ADC.
+                long sum = 0;
+                for (int s = 0; s < ACS712_SAMPLES; s++) {
+                    sum += analogRead(sensores[i].gpioPin);
+                    delayMicroseconds(200);
+                }
+                float avgRaw = (float)(sum / ACS712_SAMPLES);
+                float voltage = avgRaw * (3.3f / 4095.0f);
+                float amps = (voltage - ACS712_VREF) / ACS712_SENSITIVITY;
+                val = (amps < 0.0f) ? 0.0f : amps;
+                ok  = true;
             } else {
-                val = inR ? (float)raw : NAN;
+                int raw  = analogRead(sensores[i].gpioPin);
+                bool inR = (raw > ADC_MIN && raw < ADC_MAX);
+                if (strcmp(ty, "SOIL_MOISTURE") == 0) {
+                    val = inR ? (float)map(raw, 4095, 0, 0, 100) : NAN;
+                } else if (isTemp) {
+                    float t = raw * (3.3f / 4095.0f) * 100.0f;
+                    val = (inR && t > 0.0f && t < 85.0f) ? t : NAN;
+                } else {
+                    val = inR ? (float)raw : NAN;
+                }
+                ok = !isnan(val);
             }
-            ok = !isnan(val);
         } else if (strcmp(pr, "DIGITAL") == 0) {
-            val = (float)digitalRead(sensores[i].gpioPin);
-            ok  = true;
+            int level = digitalRead(sensores[i].gpioPin);
+            if (strcmp(ty, "SOIL_MOISTURE") == 0) {
+                // FC-28 DO: LOW = suelo húmedo (por encima del umbral del pot.)
+                //           HIGH = suelo seco  (por debajo del umbral)
+                val = (level == LOW) ? 100.0f : 0.0f;
+            } else {
+                val = (float)level;
+            }
+            ok = true;
         }
 
         sensores[i].conectado = ok;

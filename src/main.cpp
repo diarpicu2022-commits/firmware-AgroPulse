@@ -268,8 +268,9 @@ void setup() {
     displayMensaje("Conectando WiFi...", "", "Abre: AgroPulse-Setup", "si no hay red guardada");
     commConnectWifi();
     // commConnectWifi() arranca el transceiver 2.4 GHz, que puede corromper el
-    // periférico I2C del ESP32. Esperar 1 s y hacer la recuperación completa de bus.
-    delay(1000);
+    // periférico I2C del ESP32. Esperar 2 s para que el radio se estabilice
+    // antes de intentar la recuperación del bus (1 s era insuficiente).
+    delay(2000);
     displayReinit();
     // GPS init ANTES de commStartTask(): Serial2 debe estar listo antes
     // de que la tarea HTTP arranque en Core 0.

@@ -15,8 +15,20 @@
 // GPIO 34/35 son ADC solo-entrada, sin pull-up interno
 #define PIN_DHT22        4    // DHT22 — temperatura/humedad ambiente 1
 #define PIN_DHT11        5    // DHT11 — temperatura/humedad ambiente 2
-#define PIN_SUELO       34    // FC-28 humedad suelo (ADC)
-#define PIN_LM35        35    // LM35  temperatura analógica (ADC)
+#define PIN_SUELO       34    // FC-28 humedad suelo (DO digital — LOW=húmedo, HIGH=seco)
+#define PIN_CORRIENTE   35    // ACS712 — sensor de corriente (ADC, solo-entrada)
+
+// ── ACS712 — calibración ───────────────────────────────────────
+// Alimentar el módulo ACS712 a 3.3 V para que VIOUT nunca supere
+// el límite del ADC del ESP32.  Con VCC=3.3V: Voffset = VCC/2 = 1.65 V.
+// Sensibilidad según modelo (a 3.3 V ≈ sensibilidad_5V × 3.3/5):
+//   5A  → ~122 mV/A  → 0.122
+//  20A  → ~66  mV/A  → 0.066  ← valor por defecto
+//  30A  → ~44  mV/A  → 0.044
+#define ACS712_VREF         1.65f   // V — voltaje de salida con I=0 A (VCC/2)
+#define ACS712_SENSITIVITY  0.066f  // V/A — cambiar según modelo (ver tabla arriba)
+#define ACS712_SAMPLES         64   // muestras a promediar por lectura (~13 ms)
+#define ACS712_VOLTAGE      12.0f   // V — voltaje de alimentación del sistema (para P=V×I)
 
 // ── Pines actuadores ───────────────────────────────────────────
 // Relés HW-383: activos en LOW (LOW = bobina energizada)

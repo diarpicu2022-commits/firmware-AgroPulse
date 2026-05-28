@@ -2,29 +2,24 @@
 #define AGROPULSE_GPS_H
 
 /*
- * gps.h — Módulo GPS (NEO-6M / NEO-8M)
+ * gps.h — Geolocalización por IP (ip-api.com)
  *
- * Wiring:
- *   GPS TX → GPIO 16 (ESP32 RX2)
- *   GPS RX → GPIO 17 (ESP32 TX2)
- *   GPS VCC → 3.3V
- *   GPS GND → GND
+ * No requiere módulo GPS físico.  Usa la IP pública del ESP32
+ * para obtener coordenadas aproximadas a nivel de ciudad.
+ * Precisión: ~1–50 km dependiendo del ISP.
  *
- * Solo se activa en dos puntos: setup() si ya vinculado, y commVincular() tras éxito.
- * No corre en el loop principal.
- *
- * Requires: mikalhart/TinyGPSPlus in lib_deps (platformio.ini)
+ * Servicio: http://ip-api.com/json  (gratuito, sin API key, 45 req/min)
+ * GPIO 16 y 17 quedan libres (Serial2 ya no se usa).
  */
 
 #include <Arduino.h>
 
 void gpsInit();
-// Inicia Serial2 a 9600 baud en GPIO 16 (RX) / 17 (TX)
+// Sin operación (no hay hardware que inicializar).
 
 bool gpsReadBlocking(double& lat, double& lng, uint32_t timeoutMs = 10000);
-// Lee sentencias NMEA hasta obtener fix válido o agotar timeoutMs.
-// Retorna true y escribe lat/lng si hay fix. Retorna false por timeout.
-// Si retorna false, lat y lng NO son modificados.
-// Nunca bloquea más de timeoutMs ms.
+// Consulta ip-api.com y escribe lat/lng si la respuesta es válida.
+// timeoutMs se usa como timeout HTTP (máx 10 s).
+// Retorna true y escribe lat/lng si tuvo éxito. Retorna false en error.
 
 #endif // AGROPULSE_GPS_H
