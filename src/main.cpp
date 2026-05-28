@@ -338,12 +338,6 @@ void setup() {
     // El mutex en comm.cpp protege accesos concurrentes desde el menú.
     commStartTask();
 
-    // Re-aplicar GPIO de actuadores después de arrancar la tarea HTTP.
-    // El stack WiFi puede reclamar GPIO18 (VSPI_CLK) u otros pines SPI
-    // durante la inicialización del radio. gpio_reset_pin() en
-    // actuatorsSetupGPIO() desconecta los periféricos y restaura OUTPUT.
-    actuatorsSetupGPIO();
-
     // Re-aplicar INPUT_PULLUP en botones por si commDownloadConfig() o
     // actuatorsSetupGPIO() modificaron algún GPIO compartido.
     for (int i = 0; i < 4; i++) {

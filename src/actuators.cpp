@@ -1,5 +1,6 @@
 #include "actuators.h"
 #include <Preferences.h>
+#include <driver/gpio.h>   // gpio_config() para desconectar periféricos SPI sin afectar LEDC
 
 // ── Globals ────────────────────────────────────────────────────
 Actuador actuadores[MAX_ACTUADORES];
@@ -123,12 +124,15 @@ void actuatorsSetupGPIO() {
             s_servo.attach(actuadores[i].pin, 500, 2400);
             s_servo.write(90);
         } else {
-            // gpio_reset_pin desconecta el GPIO de cualquier periférico
-            // (SPI/LEDC/PWM) que pudiera haberlo tomado, p.ej. GPIO18=VSPI_CLK.
-            // Sin esto, el ESP32 puede dejar GPIO18 bajo control SPI y hacer
-            // que el relay LED parpadee al ritmo del reloj SPI.
-            gpio_reset_pin((gpio_num_t)actuadores[i].pin);
-            pinMode(actuadores[i].pin, OUTPUT);
+            // gpio_config() desconecta el pin del periférico SPI (si es GPIO18=VSPI_CLK)
+            // sin tocar LEDC ni otros canales — seguro para todos los pines de relé.
+            gpio_config_t cfg = {};
+            cfg.pin_bit_mask = (1ULL << actuadores[i].pin);
+            cfg.mode         = GPIO_MODE_OUTPUT;
+            cfg.pull_up_en   = GPIO_PULLUP_DISABLE;
+            cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+            cfg.intr_type    = GPIO_INTR_DISABLE;
+            gpio_config(&cfg);
             digitalWrite(actuadores[i].pin, actuadores[i].activeLow ? HIGH : LOW);
         }
     }
